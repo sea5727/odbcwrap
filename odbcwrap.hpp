@@ -1,5 +1,12 @@
 #pragma once
 
+#ifdef USE_POOL
+#include "mpmc_bounded_queue.hpp"
+#endif
+
+#include "mpmc_bounded_queue.hpp"
+
+
 #include <memory>
 #include <string>
 #include <iostream>
@@ -40,7 +47,8 @@ MAKE_ODBCWRAP_TYPE_NOT_NULL(Double, double);
 class name { \
 public: \
     type value; \
-    bool valid; \
+    bool valid() { return len>0; }; \
+    long len; \
 }
 MAKE_ODBCWRAP_TYPE_NULLABLE(NullBool, bool);
 MAKE_ODBCWRAP_TYPE_NULLABLE(NullInt16, int16_t);
@@ -54,12 +62,16 @@ MAKE_ODBCWRAP_TYPE_NULLABLE(NullDouble, double);
 #undef MAKE_ODBCWRAP_TYPE_NULLABLE
     template <int N>
     class Char {
+    public:
         char value[N] = {0,};
+        long len;
     };
     template <int N>
     class NullChar {
+    public:
         char value[N] = {0,};
-        bool valid;
+        bool valid() { return len > 0; }
+        long len;
     };
 }
 
@@ -152,7 +164,11 @@ namespace odbcwrap {
     public:
         SQLHDBC dbc = SQL_NULL_HDBC;
         odbc_hdbc() = default;
-        odbc_hdbc(SQLHDBC dbc) : dbc(dbc) {} // copy constructor
+        odbc_hdbc(SQLHDBC dbc) : dbc(dbc) {} 
+        odbc_hdbc(odbc_hdbc &&rhs) {
+            dbc = rhs.dbc;
+            rhs.dbc = SQL_NULL_HDBC;
+        } 
         ~odbc_hdbc() {
             if(dbc != SQL_NULL_HDBC) {
                 SQLDisconnect(dbc);
@@ -168,7 +184,11 @@ namespace odbcwrap {
     public:
         SQLHSTMT stmt = SQL_NULL_HSTMT;
         odbc_hstmt() = default;
-        odbc_hstmt(SQLHSTMT stmt) : stmt(stmt) {} // copy constructor
+        odbc_hstmt(SQLHSTMT stmt) : stmt(stmt) {} 
+        odbc_hstmt(odbc_hstmt &&rhs) {
+            stmt = rhs.stmt;
+            rhs.stmt = SQL_NULL_HSTMT;
+        } 
         ~odbc_hstmt(){
             if(stmt != SQL_NULL_HSTMT){
                 SQLRETURN status = SQLFreeStmt(stmt, SQL_DROP);
@@ -206,8 +226,9 @@ namespace odbcwrap {
 
         void
         directExecute(const std::string & query) /* throwable */ {
+            // SQLFreeStmt(stmt->stmt, SQL_CLOSE);
             SQLRETURN status = SQLExecDirect(stmt->stmt, (SQLCHAR *)query.c_str(), SQL_NTS);
-            if( status != SQL_SUCCESS){
+            if( status != SQL_SUCCESS && status != SQL_NO_DATA/*for insert/update/delete query */){
                 throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status);
             }
         }
@@ -355,17 +376,17 @@ namespace odbcwrap {
 
 
         template< unsigned N >
-        void bind(const int index, const char (&arr)[N] ) /* throwable */ {
+        void bind(const int idx, const char (&param)[N] ) /* throwable */ {
             SQLRETURN status = SQL_SUCCESS;
             status = SQLBindParameter( stmt->stmt,
-                                    index,
+                                    idx,
                                     SQL_PARAM_INPUT,
                                     SQL_C_CHAR,
                                     SQL_CHAR,
                                     0,
                                     0,
-                                    (SQLPOINTER)arr,
-                                    strlen(arr),
+                                    (SQLPOINTER)param,
+                                    strlen(param),
                                     NULL );
             if(status != SQL_SUCCESS){
                 throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status);
@@ -373,10 +394,10 @@ namespace odbcwrap {
         }
 
 
-        void bind(const int index, const std::string & param) {
+        void bind(const int idx, const std::string & param) {
             SQLRETURN status = 1;
             status = SQLBindParameter( stmt->stmt,
-                                    index,
+                                    idx,
                                     SQL_PARAM_INPUT,
                                     SQL_C_CHAR,
                                     SQL_CHAR,
@@ -399,7 +420,7 @@ namespace odbcwrap {
         void
         bindParams(int idx, const Param1 & param1, const Params&... rest) {
             bind(idx, param1);
-            bindParam1(++idx, rest...);
+            bindParams(++idx, rest...);
         }
 
 #define MAKE_BIND_COL_DEF_TYPE_NOT_NULL(cpptype, sql_type) \
@@ -414,8 +435,8 @@ MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int, SQL_C_SLONG)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(unsigned int , SQL_C_ULONG)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int16_t, SQL_C_SSHORT)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(uint16_t, SQL_C_USHORT)
-MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int64_t, SQL_C_SLONG)
-MAKE_BIND_COL_DEF_TYPE_NOT_NULL(uint64_t, SQL_C_ULONG)
+MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int64_t, SQL_C_SBIGINT)
+MAKE_BIND_COL_DEF_TYPE_NOT_NULL(uint64_t, SQL_C_UBIGINT)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(float, SQL_C_FLOAT)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(double, SQL_C_DOUBLE)
 #undef MAKE_BIND_COL_DEF_TYPE_NOT_NULL
@@ -428,12 +449,12 @@ bindCol (const int index, odbcwraptype * buffer) { \
         throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status); \
     } \
 }
-MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int16, SQL_C_SLONG)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(UInt16 , SQL_C_ULONG)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int32, SQL_C_SSHORT)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(UInt32, SQL_C_USHORT)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int64, SQL_C_SLONG)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(UInt64, SQL_C_ULONG)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int16, SQL_C_SSHORT)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(UInt16 , SQL_C_USHORT)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int32, SQL_C_SLONG)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(UInt32, SQL_C_ULONG)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int64, SQL_C_SBIGINT)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(UInt64, SQL_C_UBIGINT)
 MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Float, SQL_C_FLOAT)
 MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Double, SQL_C_DOUBLE)
 #undef MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL
@@ -441,20 +462,18 @@ MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Double, SQL_C_DOUBLE)
 #define MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(type, sql_type) \
 void \
 bindCol (const int index, type * buffer) { \
-    long len = 0; \
-    SQLRETURN status = SQLBindCol(stmt->stmt, index, sql_type, &buffer->value, 0, &len); \
-    if (len > 0) buffer->valid = true; \
-    else buffer->valid = false; \
+    buffer->len = 0; \
+    SQLRETURN status = SQLBindCol(stmt->stmt, index, sql_type, &buffer->value, 0, &buffer->len); \
     if (status != SQL_SUCCESS) { \
         throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status); \
     } \
 }
-MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullInt16, SQL_C_SLONG)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullUInt16 , SQL_C_ULONG)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullInt32, SQL_C_SSHORT)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullUInt32, SQL_C_USHORT)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullInt64, SQL_C_SLONG)
-MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullUInt64, SQL_C_ULONG)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullInt16, SQL_C_SSHORT)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullUInt16 , SQL_C_USHORT)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullInt32, SQL_C_SLONG)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullUInt32, SQL_C_ULONG)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullInt64, SQL_C_SBIGINT)
+MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullUInt64, SQL_C_UBIGINT)
 MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullFloat, SQL_C_FLOAT)
 MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullDouble, SQL_C_DOUBLE)
 #undef MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE
@@ -462,8 +481,8 @@ MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullDouble, SQL_C_DOUBLE)
         template <int N>
         void
         bindCol(const int index, Char<N> * buffer) {
-            long len = 0;
-            SQLRETURN status = SQLBindCol(stmt->stmt, index, SQL_C_CHAR, buffer->value, N, 0);
+            buffer->len = 0;
+            SQLRETURN status = SQLBindCol(stmt->stmt, index, SQL_C_CHAR, buffer->value, N, &buffer->len);
             if (status != SQL_SUCCESS){
                 throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status);
             }
@@ -471,14 +490,14 @@ MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullDouble, SQL_C_DOUBLE)
         template <int N>
         void
         bindCol(const int index, NullChar<N> * buffer) {
-            long len = 0;
-            SQLRETURN status = SQLBindCol(stmt->stmt, index, SQL_C_CHAR, buffer->value, N, &len);
-            if (len > 0) buffer->valid = true;
-            else buffer->valid = false;
+            buffer->len = 0;
+            SQLRETURN status = SQLBindCol(stmt->stmt, index, SQL_C_CHAR, buffer->value, N, &buffer->len);
             if (status != SQL_SUCCESS){
                 throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status);
             }
         }
+
+
         template< unsigned N >
         void bindCol(const int index, const char (&arr)[N] ) /* throwable */ {
             SQLRETURN status = SQLBindCol(stmt->stmt, index, SQL_C_CHAR, arr, N, 0);
@@ -498,7 +517,7 @@ MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullDouble, SQL_C_DOUBLE)
             }
 
             status = SQLFetch(stmt->stmt);
-            if (status != SQL_SUCCESS) {
+            if (status != SQL_SUCCESS && status != SQL_SUCCESS_WITH_INFO) {
                 if (status == SQL_NULL_DATA) {
                     throw odbc_error("failure SQLFetch SQL_NULL_DATA");
                 }
@@ -528,6 +547,8 @@ MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullDouble, SQL_C_DOUBLE)
 
 namespace odbcwrap {
     class odbc_connection {
+        template <typename T>
+        friend class tp::MPMCBoundedQueue;
     public:
         std::string dsn;
         std::string uid;
@@ -563,6 +584,13 @@ namespace odbcwrap {
             : dsn(dsn) , uid(uid), pwd(pwd) {
             init();
         }
+    public:
+        odbc_connection(odbc_connection && rhs) noexcept
+            : dsn(std::move(rhs.dsn))
+            , uid(std::move(rhs.uid))
+            , pwd(std::move(rhs.pwd))
+            , dbc(std::move(rhs.dbc))
+        {}
 
     public:
 
@@ -673,3 +701,23 @@ namespace odbcwrap {
     };
 }
 
+
+
+namespace odbcwrap {
+    
+    class odbc_connnection_pool {
+    public:
+        static
+        tp::MPMCBoundedQueue<std::shared_ptr<odbc_connection>>
+        make(size_t size, const std::string & dsn, const std::string & uid, const std::string & pwd) {
+            auto pool = tp::MPMCBoundedQueue<std::shared_ptr<odbc_connection>>(size);
+            for(int i = 0 ; i < size ; i++){
+                auto conn = odbc_connection::make(dsn, uid, pwd);
+                pool.push(conn);
+            }
+
+            return pool;
+        }
+
+    };
+}
