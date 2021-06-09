@@ -547,8 +547,6 @@ MAKE_BIND_COL_ODBCWRAP_TYPE_NULLABLE(NullDouble, SQL_C_DOUBLE)
 
 namespace odbcwrap {
     class odbc_connection {
-        template <typename T>
-        friend class tp::MPMCBoundedQueue;
     public:
         std::string dsn;
         std::string uid;
