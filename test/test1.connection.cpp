@@ -18,15 +18,23 @@ int main(int argc, char* argv[]) {
     int sleep = std::stoi(argv[4]);
 
     try {
-        auto conn = odbcwrap::odbc_connection::make();
-        conn->setDsn(dsn);
-        conn->setUid(uid);
-        conn->setPwd(pwd);
-        conn->connectDB();
-        std::this_thread::sleep_for(std::chrono::seconds(sleep)); 
-        // you can command netstat 
 
-        conn->disconnectDB();
+
+        {
+            auto conn = odbcwrap::odbc_connection::make();
+            conn->init();
+            conn->setDsn(dsn);
+            conn->setUid(uid);
+            conn->setPwd(pwd);
+            conn->connectDB();
+            
+            std::this_thread::sleep_for(std::chrono::seconds(sleep)); 
+            // you can command netstat 
+
+            conn->disconnectDB();
+        }
+
+
     } catch (const odbcwrap::odbc_error & err) {
         std::cout << "odbc_error : " << err.what() << std::endl;
     } catch (const std::exception & err) {

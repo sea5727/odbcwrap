@@ -47,7 +47,7 @@ MAKE_ODBCWRAP_TYPE_NOT_NULL(Double, double);
 class name { \
 public: \
     type value; \
-    bool valid() { return len>0; }; \
+    bool valid() { return len!=0; }; \
     long len; \
 }
 MAKE_ODBCWRAP_TYPE_NULLABLE(NullBool, bool);
@@ -553,20 +553,21 @@ namespace odbcwrap {
         std::string dsn;
         std::string uid;
         std::string pwd; 
-
+        /* TODO 만약 odbc_connection을 new로 사용한다면 odbc_hdbc를 shared_ptr로 두어야 하고, 
+        /* odbc_connection을 shared_ptr로 사용한다면 굳이 odbc_hdbc를 shared_ptr로 하지 않아도 될것같은데..
+         */
+        std::shared_ptr<odbc_hdbc> dbc;
+        
         static
         std::shared_ptr<odbc_connection>
-        make(
-            const std::string & dsn = "",
-            const std::string & uid = "",
-            const std::string & pwd = "") {
-            
-            return std::shared_ptr<odbc_connection>(new odbc_connection(dsn, uid, pwd));
+        make() {
+            return std::shared_ptr<odbc_connection>(new odbc_connection);
         }
 
-    private:
-        std::shared_ptr<odbc_hdbc> dbc;
-        void init () /* throwable */ {
+    public:
+        
+        odbc_connection *
+        init () /* throwable */ {
             auto om = odbc_env::getInstance();
             SQLRETURN status = SQL_SUCCESS;
             SQLHDBC tmpdbc;
@@ -575,16 +576,11 @@ namespace odbcwrap {
                 throw odbc_error("failure SQLAllocHandle SQL_HANDLE_DBC");
             }
             dbc = std::make_shared<odbc_hdbc>(tmpdbc);
-        }
 
-        odbc_connection(
-            const std::string & dsn = "",
-            const std::string & uid = "",
-            const std::string & pwd = "") /* throwable */
-            : dsn(dsn) , uid(uid), pwd(pwd) {
-            init();
+            return this;
         }
-    public:
+    private:
+        odbc_connection() = default;
         odbc_connection(odbc_connection && rhs) noexcept
             : dsn(std::move(rhs.dsn))
             , uid(std::move(rhs.uid))
@@ -707,17 +703,11 @@ namespace odbcwrap {
     
     class odbc_connnection_pool {
     public:
-        static
-        tp::MPMCBoundedQueue<std::shared_ptr<odbc_connection>>
-        make(size_t size, const std::string & dsn, const std::string & uid, const std::string & pwd) {
-            auto pool = tp::MPMCBoundedQueue<std::shared_ptr<odbc_connection>>(size);
-            for(int i = 0 ; i < size ; i++){
-                auto conn = odbc_connection::make(dsn, uid, pwd);
-                pool.push(conn);
-            }
-
-            return pool;
-        }
+        // static
+        // tp::MPMCBoundedQueue<std::shared_ptr<odbc_connection>>
+        // make(size_t size) {
+        //     return pool;
+        // }
 
     };
 }

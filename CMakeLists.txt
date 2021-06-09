@@ -7,9 +7,12 @@ include(CTest)
 enable_testing()
 
 
+
+
 link_libraries(odbc)
+add_subdirectory(test)
 # add_executable(odbcwrap main.cpp)
-add_executable(odbcwrap2 main2.cpp)
+# add_executable(odbcwrap2 main2.cpp)
 # add_executable(odbcwrap3 main3.cpp)
 # add_executable(odbcwrap4 main4.cpp)
 # add_executable(odbcwrap5 main5.cpp)
