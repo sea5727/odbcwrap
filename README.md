@@ -1,6 +1,6 @@
 # odbcwrap
 
-C++11 DB client library wrapped ODBC
+C++11 DB client library wrapped ODBC    
 just hpp header file
 
 # function list
