@@ -1,12 +1,5 @@
 #pragma once
 
-#ifdef USE_POOL
-#include "mpmc_bounded_queue.hpp"
-#endif
-
-#include "mpmc_bounded_queue.hpp"
-
-
 #include <memory>
 #include <string>
 #include <iostream>
@@ -431,10 +424,12 @@ bindCol (const int index, cpptype * buffer) { \
         throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status); \
     } \
 }
-MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int, SQL_C_SLONG)
-MAKE_BIND_COL_DEF_TYPE_NOT_NULL(unsigned int , SQL_C_ULONG)
+
+MAKE_BIND_COL_DEF_TYPE_NOT_NULL(bool, SQL_C_USHORT)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int16_t, SQL_C_SSHORT)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(uint16_t, SQL_C_USHORT)
+MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int, SQL_C_SLONG)
+MAKE_BIND_COL_DEF_TYPE_NOT_NULL(unsigned int , SQL_C_ULONG)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(int64_t, SQL_C_SBIGINT)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(uint64_t, SQL_C_UBIGINT)
 MAKE_BIND_COL_DEF_TYPE_NOT_NULL(float, SQL_C_FLOAT)
@@ -449,6 +444,7 @@ bindCol (const int index, odbcwraptype * buffer) { \
         throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status); \
     } \
 }
+MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Bool , SQL_C_USHORT)
 MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int16, SQL_C_SSHORT)
 MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(UInt16 , SQL_C_USHORT)
 MAKE_BIND_COL_ODBCWRAP_TYPE_NOT_NULL(Int32, SQL_C_SLONG)
@@ -624,10 +620,42 @@ namespace odbcwrap {
             return (bool)value; 
         }
 
+
+        /*
+        https://stackoverflow.com/questions/2309684/connection-timeout-in-odbc
+        I had the same question. Actually, just the moment I'm writing this, 
+        I checked the SQLSetConnectAttr and was surprisedly reading the first sentence
+
+        "The SQL Server Native Client ODBC driver ignores the setting of SQL_ATTR_CONNECTION_TIMEOUT."
+        커넥션 timeout은 안된다고 합니다..
+        */
+        void
+        setConnectionTimeout(const long timeout) {
+            SQLRETURN status = 
+            SQLSetConnectAttr (dbc->dbc, 
+            SQL_ATTR_CONNECTION_TIMEOUT, (SQLPOINTER) timeout, 0);
+            if (status != SQL_SUCCESS){
+                throw odbc_error(SQL_HANDLE_DBC, dbc->dbc, status);
+            }
+        }
+
+        int
+        getConnectionTimeout() {
+            SQLINTEGER value = 0;
+            SQLRETURN status = 
+            SQLGetConnectAttr(dbc->dbc, SQL_ATTR_CONNECTION_TIMEOUT, 
+                (SQLPOINTER) &value, (SQLINTEGER) sizeof(value), NULL);
+            if (status != SQL_SUCCESS){
+                throw odbc_error(SQL_HANDLE_DBC, dbc->dbc, status);
+            }
+            return value; 
+        }
+
+
         void
         setLoginTimeout(const long login_timeout) {
             SQLRETURN status = 
-            SQLSetConnectAttr(dbc->dbc, 
+            SQLSetConnectAttr (dbc->dbc, 
             SQL_ATTR_LOGIN_TIMEOUT, (SQLPOINTER) login_timeout, 0);
             if (status != SQL_SUCCESS){
                 throw odbc_error(SQL_HANDLE_DBC, dbc->dbc, status);
@@ -685,6 +713,22 @@ namespace odbcwrap {
                 throw odbc_error(SQL_HANDLE_DBC, dbc->dbc, status);
             }
             mtx.unlock();
+        }
+
+        void
+        commit(){
+            SQLRETURN status = SQLTransact(NULL, dbc->dbc, SQL_COMMIT);
+            if (status != SQL_SUCCESS){
+                throw odbc_error(SQL_HANDLE_DBC, dbc->dbc, status);
+            }
+        }
+
+        void
+        rollback(){
+            SQLRETURN status = SQLTransact(NULL, dbc->dbc, SQL_ROLLBACK);
+            if (status != SQL_SUCCESS){
+                throw odbc_error(SQL_HANDLE_DBC, dbc->dbc, status);
+            }
         }
 
         std::shared_ptr<odbc_statement>

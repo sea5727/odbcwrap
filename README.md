@@ -18,16 +18,116 @@ just hpp header file
 ``` cpp
 #include "odbwrap.hpp"
 
+auto conn = odbcwrap::odbc_connection::make();
+conn->init();
+conn->setDsn(dsn);
+conn->setUid(uid);
+conn->setPwd(pwd);
+conn->setAutoCommit(true);
+conn->connectDB();
+
+auto isAutoCommit = conn->getAutoCommit();
+conn->setAutoCommmit(false);
+conn->commit();
+conn->rollback();
 
 ```
 
+## ping
+``` cpp
+#include "odbwrap.hpp"
+
+auto sql = conn->sql();
+sql->directExecute("SELECT 1;");
+sql->fetch();
+```
+
+## select & data type
+``` cpp
+#include "odbwrap.hpp"
+
+odbcwrap::Int32 data1;
+odbcwrap::UInt64 data2;
+odbcwrap::Float data3;
+odbcwrap::Char<20 + 1> data4;
+odbcwrap::NullInt32 data5;
+odbcwrap::NullChar<10 + 1> data6;
+
+auto sql = conn->sql();
+sql->directExecute("SELECT DATA1, DATA2, DATA3, DATA4, DATA5, DATA6 FROM TBL_TEST WHERE  \
+    DATA1=? AND DATA2=? AND DATA3=? AND DATA4=? AND DATA5=? AND DATA6=?");
+sql->bindCol(1, &data1);
+sql->bindCol(2, &data2);
+sql->bindCol(3, &data3);
+sql->bindCol(4, &data4);
+sql->bindCol(5, &data5);
+sql->bindCol(6, &data6);
+
+while(sql->fetch()){
+    std::cout << data1.value << std::endl;
+    std::cout << data2.value << std::endl;
+    std::cout << data3.value << std::endl;
+    std::cout << data4.value << std::endl;
+    if(data5.Valid()) std::cout << data5.value << std::endl;
+    if(data6.Valid()) std::cout << data6.value << std::endl;
+    
+}
+
+```
+
+## insert/update/delete 
+``` cpp
+auto sql = conn->sql();
+sql->directExecute(QUERY_INSERT_1_FOR_NULL);
+cnt1 = sql->rowCount();
+```
+
+## disconnect / check connectcion
+``` cpp
+if(conn->getConnectionDead())
+    conn->disconnectDB();
+```
+just use. noexcept
+``` cpp
+conn->disconnectDB();
+```
+
+## prepare query / reuse query / stmt handle
+no binding query
+``` cpp
+auto sql = conn->sql();
+sql.prepare("SELECT DATA1, DATA2, DATA3, DATA4 FROM TBL_TEST WHERE DATA1=1");
+
+for(int i = 0 ; 1000; i++){
+    sql->execute();
+}
+```
+binding query
+``` cpp
+auto sql = conn->sql();
+sql.prepare("SELECT DATA1, DATA2, DATA3, DATA4 FROM TBL_TEST WHERE DATA1=?");
+
+for(int i = 0 ; 1000; i++){
+    sql->bindExecute(i);
+}
+```
+
+## dbcp
+It is possible that use a dbcp for sychronized connection with [others queue library mpmc_bounded_queue](https://github.com/inkooboo/thread-pool-cpp/blob/af95dd88daa094f67bbd178b639c7282373a3b09/include/thread_pool/mpmc_bounded_queue.hpp)
+
+see test source
+
 # issue 
--   how to read VARCHAR(1) type ???    
+-   how to read VARCHAR(1) `type` ???    
 VARCHAR 타입을 char로 받아올수는 없는걸까?
+- how to bind parameter `null`??
+파라미터 바인딩을 할때 null을 넣는 방법?
 
 # todo list
 1. connection pool
 2. more test case
+3. override method for odbcwrap::datatype `==`, `=`, `<<`, `>>` ??또 있나?
+
 
 # connection pool
 

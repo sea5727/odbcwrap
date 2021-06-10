@@ -151,6 +151,7 @@ inline MPMCBoundedQueue<T>::MPMCBoundedQueue(size_t size)
 template <typename T>
 inline MPMCBoundedQueue<T>::MPMCBoundedQueue(MPMCBoundedQueue&& rhs) noexcept
 {
+    // *this = rhs;
     if (this != &rhs)
     {
         m_buffer = std::move(rhs.m_buffer);

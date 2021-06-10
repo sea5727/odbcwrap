@@ -46,24 +46,51 @@ int main(int argc, char* argv[]) {
         conn->setPwd(pwd);
         conn->connectDB();
 
+        odbcwrap::Bool data1;
+        odbcwrap::Int16 data2;
+        odbcwrap::UInt16 data3;
+        odbcwrap::Int32 data4;
+        odbcwrap::UInt32 data5;
+        odbcwrap::Int64 data6;
+        odbcwrap::UInt64 data7;
+        odbcwrap::Float data8;
+        odbcwrap::Double data9;
+        odbcwrap::Char<16 + 1> data10;
+        odbcwrap::Char<16 + 1> data11;
 
-        int data = 0;
-        int cnt1 = 0;
-        int cnt2 = 0;
-        int cnt3 = 0;
         auto sql = conn->sql();
-        sql->directExecute(QUERY_INSERT_1_FOR_NULL);
-        cnt1 = sql->insertRowCount();
-        std::cout << "insert:" << cnt1 << std::endl;
-        sql->directExecute(QUERY_INSERT_2_NOT_NULL);
-        cnt2 = sql->insertRowCount();
-        std::cout << "insert:" << cnt2 << std::endl;
-        sql->directExecute(QUERY_INSERT_3_NOT_NULL);
-        cnt3 = sql->insertRowCount();
-        std::cout << "insert:" << cnt3 << std::endl;
+        
+        sql->directExecute("SELECT DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7, DATA8, DATA9, DATA10, DATA11 FROM TBL_TEST WHERE \
+            DATA1=? AND DATA2=? AND DATA3=? AND DATA4=? AND DATA5=? AND DATA6=? AND DATA7=? AND DATA8=? AND DATA9=? AND DATA10=? AND DATA11=?;", 
+            true, 1, 2, 3, 4, 5, 6, 7, 8, 9, "test_const_char", std::string("test_string"));
+        sql->bindCol(1, &data1);
+        sql->bindCol(2, &data2);
+        sql->bindCol(3, &data3);
+        sql->bindCol(4, &data4);
+        sql->bindCol(5, &data5);
+        sql->bindCol(6, &data6);
+        sql->bindCol(7, &data7);
+        sql->bindCol(8, &data8);
+        sql->bindCol(9, &data9);
+        sql->bindCol(10, &data10);
+        sql->bindCol(11, &data11);
 
-        std::this_thread::sleep_for(std::chrono::seconds(sleep)); 
-        conn->disconnectDB();
+        while(sql->fetch()){
+            
+            std::cout << "data1: " << data1.value << std::endl;
+            std::cout << "data2: " << data2.value << std::endl;
+            std::cout << "data3: " << data3.value << std::endl;
+            std::cout << "data4: " << data4.value << std::endl;
+            std::cout << "data5: " << data5.value << std::endl;
+            std::cout << "data6: " << data6.value << std::endl;
+            std::cout << "data7: " << data7.value << std::endl;
+            std::cout << "data8: " << data8.value << std::endl;
+            std::cout << "data9: " << data9.value << std::endl;
+            std::cout << "data10: " << data10.value << std::endl;
+            std::cout << "data11: " << data11.value << std::endl;
+        }
+
+        
     } catch (const odbcwrap::odbc_error & err) {
         std::cout << "odbc_error : " << err.what() << std::endl;
     } catch (const std::exception & err) {

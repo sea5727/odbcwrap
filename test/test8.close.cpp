@@ -30,7 +30,8 @@ int main(int argc, char* argv[]) {
         conn->setUid(uid);
         conn->setPwd(pwd);
         conn->connectDB();
-        conn->disconnectDB();
+        if(conn->getConnectionDead())
+            conn->disconnectDB();
         // you can command netstat 
         std::this_thread::sleep_for(std::chrono::seconds(sleep)); 
     } catch (const odbcwrap::odbc_error & err) {
