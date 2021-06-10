@@ -1,6 +1,6 @@
 # odbcwrap
 
-C++11 DB client library wrapped ODBC    
+C++11 DB library wrapped ODBC    
 this is very simple library. just use one hpp header file.   
 It is possible that use a dbcp with others queue library that [mpmc_bounded_queue](https://github.com/inkooboo/thread-pool-cpp/blob/af95dd88daa094f67bbd178b639c7282373a3b09/include/thread_pool/mpmc_bounded_queue.hpp)
 
