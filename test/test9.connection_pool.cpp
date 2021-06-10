@@ -11,7 +11,7 @@ WHERE MYKEY = ?"
 
 
 
-auto dbcp = tp::MPMCBoundedQueue<std::shared_ptr<odbcwrap::odbc_connection>>(4);
+auto dbcp = tp::MPMCBoundedQueue<std::shared_ptr<odbcwrap::odbc_connection>>(4); // mpmc_bounded_queue
 
 // ./test.select JMC_ALTI jmc dbadmin 5
 int main(int argc, char* argv[]) {
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
             conn->setDsn(dsn);
             conn->setUid(uid);
             conn->setPwd(pwd);
-            conn->connectDB();
+            conn->connectDB(); // just sync connection.. It should be a asynchronous connection??
 
             dbcp.push(conn);
         }
