@@ -1,5 +1,5 @@
 # odbcwrap
-this is very simple library
+this is very simple library   
 C++11 DB client library wrapped ODBC    
 just hpp header file
 
