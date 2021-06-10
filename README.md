@@ -55,7 +55,8 @@ odbcwrap::NullChar<10 + 1> data6;
 
 auto sql = conn->sql();
 sql->directExecute("SELECT DATA1, DATA2, DATA3, DATA4, DATA5, DATA6 FROM TBL_TEST WHERE  \
-    DATA1=? AND DATA2=? AND DATA3=? AND DATA4=? AND DATA5=? AND DATA6=?");
+    DATA1=? AND DATA2=? AND DATA3=? AND DATA4=? AND DATA5=? AND DATA6=?", 
+    1, 2, 333.333f, "constchar", 4, std::string("stringdata"));
 sql->bindCol(1, &data1);
 sql->bindCol(2, &data2);
 sql->bindCol(3, &data3);
