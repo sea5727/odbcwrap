@@ -79,7 +79,8 @@ while(sql->fetch()){
 ## insert/update/delete 
 ``` cpp
 auto sql = conn->sql();
-sql->directExecute(QUERY_INSERT_1_FOR_NULL);
+sql->directExecute("INSERT INTO TBL_TEST (DATA1, DATA2, DATA3, DATA4, DATA5, DATA6) VALUES (?, ?, ?, ?, ?, ?)",
+    1, 2, 333.333f, "constchar", 4, "stringdata");
 cnt1 = sql->rowCount();
 ```
 
