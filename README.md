@@ -10,7 +10,8 @@ just hpp header file
 4. query prepare and execute for reuse
 5. query with binding parameter
 6. db connection close
-7. connection pool (#TODO)
+7. exception
+8. connection pool (#TODO)
 
 # example
 
