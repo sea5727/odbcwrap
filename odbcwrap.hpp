@@ -41,7 +41,7 @@ class name { \
 public: \
     type value; \
     bool valid() { return len!=0; }; \
-    long len; \
+    SQLINTEGER len; \
 }
 MAKE_ODBCWRAP_TYPE_NULLABLE(NullBool, bool);
 MAKE_ODBCWRAP_TYPE_NULLABLE(NullInt16, int16_t);
@@ -57,14 +57,14 @@ MAKE_ODBCWRAP_TYPE_NULLABLE(NullDouble, double);
     class Char {
     public:
         char value[N] = {0,};
-        long len;
+        SQLINTEGER len;
     };
     template <int N>
     class NullChar {
     public:
         char value[N] = {0,};
         bool valid() { return len > 0; }
-        long len;
+        SQLINTEGER len;
     };
 }
 
@@ -184,7 +184,7 @@ namespace odbcwrap {
         } 
         ~odbc_hstmt(){
             if(stmt != SQL_NULL_HSTMT){
-                SQLRETURN status = SQLFreeStmt(stmt, SQL_DROP);
+                SQLFreeStmt(stmt, SQL_DROP);
                 stmt = SQL_NULL_HSTMT;
             }                
         }
@@ -404,6 +404,41 @@ namespace odbcwrap {
             }
         }
 
+
+        void bind(const int idx, const int64_t & param) {
+            SQLRETURN status = 1;
+            status = SQLBindParameter( stmt->stmt,
+                                    idx,
+                                    SQL_PARAM_INPUT,
+                                    SQL_C_SBIGINT,
+                                    SQL_DECIMAL,
+                                    0,
+                                    0,
+                                    (SQLPOINTER)&param,
+                                    sizeof(param),
+                                    NULL );
+            if(status != SQL_SUCCESS){
+                throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status);
+            }
+        }
+
+        void bind(const int idx, const uint64_t & param) {
+            SQLRETURN status = 1;
+            status = SQLBindParameter( stmt->stmt,
+                                    idx,
+                                    SQL_PARAM_INPUT,
+                                    SQL_C_UBIGINT,
+                                    SQL_DECIMAL,
+                                    0,
+                                    0,
+                                    (SQLPOINTER)&param,
+                                    sizeof(param),
+                                    NULL );
+            if(status != SQL_SUCCESS){
+                throw odbc_error(SQL_HANDLE_STMT, stmt->stmt, status);
+            }
+        }
+
         template <typename Param1>
         void
         bindParams(int idx, const Param1 & param1) {
@@ -548,7 +583,7 @@ namespace odbcwrap {
         std::string uid;
         std::string pwd; 
         /* TODO 만약 odbc_connection을 new로 사용한다면 odbc_hdbc를 shared_ptr로 두어야 하고, 
-        /* odbc_connection을 shared_ptr로 사용한다면 굳이 odbc_hdbc를 shared_ptr로 하지 않아도 될것같은데..
+          odbc_connection을 shared_ptr로 사용한다면 굳이 odbc_hdbc를 shared_ptr로 하지 않아도 될것같은데..
          */
         std::shared_ptr<odbc_hdbc> dbc;
         
